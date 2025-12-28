@@ -1,38 +1,40 @@
 name: MySQL Periodic Updater
 slug: mysql_periodic_updater
-description: Runs a MySQL UPDATE query every 5 minutes
-version: "1.0.0"
+description: Runs a MySQL UPDATE query at a configurable interval
+version: "1.2.0"
 startup: application
 boot: auto
+
 arch:
   - amd64
   - aarch64
 
 options:
+  interval_seconds: 300
+  test_connection: false
+
   mysql:
     host: db.local
     port: 3306
     user: ha_user
     password: secret
     database: ha_db
-  update:
-    table: my_table
-    id_column: id
-    target_id: 123
+
+  statistics:
+    sensor_name: sensor.dk_spi_z10345_energy_meter
 
 schema:
+  interval_seconds: int
+  test_connection: bool
+
   mysql:
     host: str
     port: int
     user: str
     password: password
     database: str
-  update:
-    table: str
-    id_column: str
-    target_id: int
 
-map:
-  - config:rw
+  statistics:
+    sensor_name: str
 
 log_level: info
