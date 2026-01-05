@@ -2,8 +2,9 @@ import json
 import re
 import time
 import requests
-from flask import Flask, Response, abort, request
+from flask import Flask, Response, abort
 from icalendar import Calendar
+from datetime import datetime
 
 OPTIONS_FILE = "/data/options.json"
 
@@ -20,7 +21,8 @@ FILTERS = options.get("filters", [])
 
 cache = {
     "timestamp": 0,
-    "data": None
+    "calendar": None,
+    "raw": None
 }
 
 app = Flask(__name__)
@@ -40,13 +42,11 @@ def event_allowed(event):
 
     return True
 
-@app.route("/calendar.ics")
-def calendar():
+def fetch_calendar():
     now = time.time()
 
-    # Serve cached calendar if valid
-    if cache["data"] and now - cache["timestamp"] < CACHE_MINUTES * 60:
-        return Response(cache["data"], mimetype="text/calendar")
+    if cache["calendar"] and now - cache["timestamp"] < CACHE_MINUTES * 60:
+        return cache["calendar"], cache["raw"]
 
     headers = {
         "User-Agent": USER_AGENT,
@@ -54,11 +54,7 @@ def calendar():
     }
 
     try:
-        response = requests.get(
-            ICS_URL,
-            headers=headers,
-            timeout=15
-        )
+        response = requests.get(ICS_URL, headers=headers, timeout=15)
         response.raise_for_status()
     except Exception as e:
         print(f"ERROR: Failed to fetch ICS feed: {e}")
@@ -74,13 +70,87 @@ def calendar():
         if event_allowed(event):
             new_cal.add_component(event)
 
-    data = new_cal.to_ical()
-    cache["timestamp"] = now
-    cache["data"] = data
+    raw = new_cal.to_ical()
+    cache.update({
+        "timestamp": now,
+        "calendar": new_cal,
+        "raw": raw
+    })
 
-    print("ICS calendar fetched and filtered successfully")
+    return new_cal, raw
 
-    return Response(data, mimetype="text/calendar")
+def format_dt(value):
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M")
+    return str(value)
+
+@app.route("/")
+def index():
+    cal, _ = fetch_calendar()
+
+    rows = []
+    for event in cal.walk("VEVENT"):
+        summary = event.get("summary", "—")
+        start = format_dt(event.decoded("dtstart"))
+        end = format_dt(event.decoded("dtend")) if event.get("dtend") else "—"
+        description = event.get("description", "")
+
+        rows.append(f"""
+        <tr>
+            <td>{summary}</td>
+            <td>{start}</td>
+            <td>{end}</td>
+            <td>{description}</td>
+        </tr>
+        """)
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Filtered Calendar</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                padding: 20px;
+            }}
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+            }}
+            th, td {{
+                border: 1px solid #ccc;
+                padding: 8px;
+                vertical-align: top;
+            }}
+            th {{
+                background: #f0f0f0;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Filtered Calendar</h1>
+        <p>Events shown are the same as served via <code>/calendar.ics</code></p>
+
+        <table>
+            <tr>
+                <th>Summary</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Description</th>
+            </tr>
+            {''.join(rows)}
+        </table>
+    </body>
+    </html>
+    """
+
+    return html
+
+@app.route("/calendar.ics")
+def calendar():
+    _, raw = fetch_calendar()
+    return Response(raw, mimetype="text/calendar")
 
 @app.route("/health")
 def health():
