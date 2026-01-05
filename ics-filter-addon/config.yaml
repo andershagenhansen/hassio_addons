@@ -1,6 +1,6 @@
 name: ICS Calendar Filter
 slug: ics_calendar_filter
-version: "1.1.1"
+version: "1.1.2"
 description: Securely filter and republish ICS calendars
 startup: services
 boot: auto
