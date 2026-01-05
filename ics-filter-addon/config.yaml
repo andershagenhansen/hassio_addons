@@ -1,0 +1,26 @@
+name: ICS Calendar Filter
+slug: ics_calendar_filter
+version: "1.0.0"
+description: Filter and re-publish ICS calendars securely
+startup: services
+boot: auto
+
+arch:
+  - amd64
+  - aarch64
+
+ports:
+  8085/tcp: 8085
+
+options:
+  ics_url: ""
+  cache_minutes: 10
+  filters: []
+
+schema:
+  ics_url: str
+  cache_minutes: int?
+  filters:
+    - field: str
+      contains: str?
+      regex: str?
