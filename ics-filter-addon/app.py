@@ -91,16 +91,20 @@ def index():
     rows = []
     for event in cal.walk("VEVENT"):
         summary = event.get("summary", "—")
-        start = format_dt(event.decoded("dtstart"))
-        end = format_dt(event.decoded("dtend")) if event.get("dtend") else "—"
+        start_dt = event.decoded("dtstart")
+        end_dt = event.decoded("dtend") if event.get("dtend") else None
         description = event.get("description", "")
 
+        start_str = format_dt(start_dt)
+        end_str = format_dt(end_dt) if end_dt else "—"
+
+        # data-sort attributes ensure correct sorting
         rows.append(f"""
         <tr>
-            <td>{summary}</td>
-            <td>{start}</td>
-            <td>{end}</td>
-            <td>{description}</td>
+            <td data-sort="{summary}">{summary}</td>
+            <td data-sort="{start_dt.timestamp() if isinstance(start_dt, datetime) else ''}">{start_str}</td>
+            <td data-sort="{end_dt.timestamp() if isinstance(end_dt, datetime) else ''}">{end_str}</td>
+            <td data-sort="{description}">{description}</td>
         </tr>
         """)
 
@@ -125,22 +129,75 @@ def index():
             }}
             th {{
                 background: #f0f0f0;
+                cursor: pointer;
+                user-select: none;
+            }}
+            th.sort-asc::after {{
+                content: " ▲";
+            }}
+            th.sort-desc::after {{
+                content: " ▼";
             }}
         </style>
     </head>
     <body>
         <h1>Filtered Calendar</h1>
-        <p>Events shown are the same as served via <code>/calendar.ics</code></p>
+        <p>Click column headers to sort</p>
 
-        <table>
-            <tr>
-                <th>Summary</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Description</th>
-            </tr>
-            {''.join(rows)}
+        <table id="calendarTable">
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">Summary</th>
+                    <th onclick="sortTable(1)">Start</th>
+                    <th onclick="sortTable(2)">End</th>
+                    <th onclick="sortTable(3)">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {''.join(rows)}
+            </tbody>
         </table>
+
+        <script>
+            let sortDir = [];
+
+            function sortTable(col) {{
+                const table = document.getElementById("calendarTable");
+                const tbody = table.tBodies[0];
+                const rows = Array.from(tbody.rows);
+
+                const asc = !sortDir[col];
+                sortDir = [];
+                sortDir[col] = asc;
+
+                rows.sort((a, b) => {{
+                    const aVal = a.cells[col].dataset.sort || "";
+                    const bVal = b.cells[col].dataset.sort || "";
+
+                    const aNum = parseFloat(aVal);
+                    const bNum = parseFloat(bVal);
+
+                    if (!isNaN(aNum) && !isNaN(bNum)) {{
+                        return asc ? aNum - bNum : bNum - aNum;
+                    }}
+
+                    return asc
+                        ? aVal.localeCompare(bVal)
+                        : bVal.localeCompare(aVal);
+                }});
+
+                tbody.innerHTML = "";
+                rows.forEach(r => tbody.appendChild(r));
+
+                // Update header indicators
+                Array.from(table.tHead.rows[0].cells).forEach((th, i) => {{
+                    th.classList.remove("sort-asc", "sort-desc");
+                    if (i === col) {{
+                        th.classList.add(asc ? "sort-asc" : "sort-desc");
+                    }}
+                }});
+            }}
+        </script>
     </body>
     </html>
     """
