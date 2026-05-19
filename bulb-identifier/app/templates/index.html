@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bulb Identifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0d0f14;
+    --surface:   #151820;
+    --border:    #252a35;
+    --accent:    #f5c842;
+    --accent2:   #e07b20;
+    --text:      #e8eaf0;
+    --muted:     #5a6070;
+    --danger:    #e05050;
+    --success:   #42c97a;
+    --flash-col: #f5c842;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 22px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 1.3rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  header .sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .status-dot {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .dot.flashing { background: var(--flash-col); animation: pulse 0.7s infinite; }
+  .dot.idle     { background: var(--success); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  /* ── Main ── */
+  main {
+    flex: 1;
+    padding: 32px;
+    max-width: 760px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* ── Controls bar ── */
+  .controls {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .controls h2 {
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-right: auto;
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    padding: 9px 18px;
+    border-radius: 7px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0d0f14;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: #ffd54f; }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border-color: var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+
+  /* ── Device list ── */
+  #device-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .device-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 16px;
+    align-items: center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .device-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: transparent;
+    transition: background 0.2s;
+    border-radius: 12px 0 0 12px;
+  }
+
+  .device-card.active {
+    border-color: var(--flash-col);
+    box-shadow: 0 0 24px rgba(245,200,66,0.12);
+  }
+
+  .device-card.active::before { background: var(--flash-col); }
+
+  .device-card.renamed {
+    border-color: var(--success);
+  }
+  .device-card.renamed::before { background: var(--success); }
+
+  /* Bulb icon */
+  .bulb-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: #1e2230;
+    border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .device-card.active .bulb-icon {
+    background: rgba(245,200,66,0.15);
+    border-color: var(--flash-col);
+    animation: glow 0.7s infinite alternate;
+  }
+
+  @keyframes glow {
+    from { box-shadow: 0 0 8px rgba(245,200,66,0.2); }
+    to   { box-shadow: 0 0 20px rgba(245,200,66,0.5); }
+  }
+
+  /* Device info */
+  .device-info { min-width: 0; }
+
+  .device-name {
+    font-weight: 700;
+    font-size: 0.97rem;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .device-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.70rem;
+    color: var(--muted);
+  }
+
+  /* Rename form */
+  .rename-form {
+    display: none;
+    margin-top: 14px;
+    grid-column: 1 / -1;
+    display: none;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .rename-form.visible {
+    display: flex;
+  }
+
+  .rename-input {
+    flex: 1;
+    background: #1a1e28;
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    padding: 9px 12px;
+    border-radius: 7px;
+    outline: none;
+    transition: border-color 0.15s;
+    min-width: 0;
+  }
+
+  .rename-input:focus { border-color: var(--accent); }
+
+  .btn-save {
+    background: var(--success);
+    color: #0d0f14;
+    border-color: var(--success);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 9px 16px;
+    border-radius: 7px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .btn-save:hover { background: #5de08a; }
+
+  .btn-cancel {
+    background: transparent;
+    color: var(--muted);
+    border: 1.5px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 9px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .btn-cancel:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Action buttons on card */
+  .card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    flex-shrink: 0;
+  }
+
+  .btn-sm {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.75rem;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-flash {
+    background: rgba(245,200,66,0.1);
+    color: var(--accent);
+    border-color: rgba(245,200,66,0.3);
+  }
+  .btn-flash:hover { background: rgba(245,200,66,0.2); border-color: var(--accent); }
+  .btn-flash:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .btn-rename {
+    background: rgba(66,201,122,0.08);
+    color: var(--success);
+    border-color: rgba(66,201,122,0.2);
+  }
+  .btn-rename:hover { background: rgba(66,201,122,0.18); border-color: var(--success); }
+
+  /* ── Cycling panel ── */
+  #cycle-panel {
+    background: var(--surface);
+    border: 1.5px solid var(--flash-col);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: none;
+    gap: 16px;
+    align-items: center;
+    box-shadow: 0 0 32px rgba(245,200,66,0.08);
+  }
+
+  #cycle-panel.visible { display: flex; }
+
+  .cycle-info { flex: 1; }
+
+  .cycle-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .cycle-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--flash-col);
+  }
+
+  .cycle-progress {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .cycle-actions { display: flex; gap: 8px; }
+
+  .btn-thats-it {
+    background: var(--accent);
+    color: #0d0f14;
+    border: none;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 0.88rem;
+    padding: 11px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-thats-it:hover { background: #ffd54f; transform: translateY(-1px); }
+
+  .btn-skip {
+    background: transparent;
+    color: var(--muted);
+    border: 1.5px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 11px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-skip:hover { border-color: var(--muted); color: var(--text); }
+
+  .btn-stop-cycle {
+    background: transparent;
+    color: var(--danger);
+    border: 1.5px solid rgba(224,80,80,0.3);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 11px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-stop-cycle:hover { border-color: var(--danger); background: rgba(224,80,80,0.08); }
+
+  /* ── Empty / loading ── */
+  .placeholder {
+    text-align: center;
+    padding: 64px 32px;
+    color: var(--muted);
+  }
+
+  .placeholder .big { font-size: 3rem; margin-bottom: 16px; }
+  .placeholder p { font-size: 0.88rem; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    padding: 12px 22px;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 99;
+    white-space: nowrap;
+  }
+
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.ok   { border-color: var(--success); color: var(--success); }
+  #toast.err  { border-color: var(--danger);  color: var(--danger); }
+
+  /* ── Responsive ── */
+  @media (max-width: 520px) {
+    main { padding: 16px; }
+    header { padding: 16px; }
+    .device-card { grid-template-columns: auto 1fr; }
+    .card-actions { flex-direction: row; grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-icon">💡</div>
+  <div>
+    <h1>Bulb Identifier</h1>
+    <div class="sub">Zigbee2MQTT · Home Assistant</div>
+  </div>
+  <div class="status-dot">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-label">idle</span>
+  </div>
+</header>
+
+<main>
+  <!-- Cycle panel (shown when auto-cycling) -->
+  <div id="cycle-panel">
+    <div class="cycle-info">
+      <div class="cycle-label">Currently flashing</div>
+      <div class="cycle-name" id="cycle-current-name">—</div>
+      <div class="cycle-progress" id="cycle-progress"></div>
+    </div>
+    <div class="cycle-actions">
+      <button class="btn-thats-it" id="btn-thats-it">✓ That's it!</button>
+      <button class="btn-skip" id="btn-skip">Skip →</button>
+      <button class="btn-stop-cycle" id="btn-stop-cycle">✕ Stop</button>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <h2 id="device-count">Loading devices…</h2>
+    <button class="btn btn-ghost" id="btn-refresh">↻ Refresh</button>
+    <button class="btn btn-primary" id="btn-start-cycle" disabled>▶ Start Auto-Cycle</button>
+  </div>
+
+  <!-- Device list -->
+  <div id="device-list">
+    <div class="placeholder">
+      <div class="big">🔍</div>
+      <p>Scanning for Zigbee light devices…</p>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const BASE = '';
+
+// ── State ────────────────────────────────────────────────────────────────────
+let allDevices   = [];
+let cycleIndex   = -1;
+let cycling      = false;
+let flashBusy    = false;
+let waitingThats = false;  // true = flashing done, waiting for user action
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const deviceList     = document.getElementById('device-list');
+const deviceCount    = document.getElementById('device-count');
+const btnStartCycle  = document.getElementById('btn-start-cycle');
+const btnRefresh     = document.getElementById('btn-refresh');
+const cyclePanel     = document.getElementById('cycle-panel');
+const cycleCurrent   = document.getElementById('cycle-current-name');
+const cycleProgress  = document.getElementById('cycle-progress');
+const btnThatsIt     = document.getElementById('btn-thats-it');
+const btnSkip        = document.getElementById('btn-skip');
+const btnStopCycle   = document.getElementById('btn-stop-cycle');
+const statusDot      = document.getElementById('status-dot');
+const statusLabel    = document.getElementById('status-label');
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function apiGet(path) {
+  const r = await fetch(BASE + path);
+  return r.json();
+}
+
+async function apiPost(path, body) {
+  const r = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type = 'ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className = '', 3000);
+}
+
+// ── Status indicator ──────────────────────────────────────────────────────────
+function setStatus(state) {
+  statusDot.className   = 'dot ' + state;
+  statusLabel.textContent = state;
+}
+
+// ── Load devices ──────────────────────────────────────────────────────────────
+async function loadDevices() {
+  deviceCount.textContent = 'Loading devices…';
+  btnStartCycle.disabled = true;
+  deviceList.innerHTML = `<div class="placeholder"><div class="big">🔍</div><p>Scanning for Zigbee light devices…</p></div>`;
+
+  const data = await apiGet('/api/devices');
+  allDevices = data;
+
+  deviceCount.textContent = `${allDevices.length} light device${allDevices.length !== 1 ? 's' : ''} found`;
+  btnStartCycle.disabled = allDevices.length === 0 || cycling;
+
+  renderDevices();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderDevices() {
+  if (allDevices.length === 0) {
+    deviceList.innerHTML = `<div class="placeholder"><div class="big">💡</div><p>No light devices found via Zigbee2MQTT.<br>Check your Z2M connection.</p></div>`;
+    return;
+  }
+
+  deviceList.innerHTML = '';
+  allDevices.forEach((dev, idx) => {
+    const card = document.createElement('div');
+    card.className = 'device-card';
+    card.id = `card-${idx}`;
+    card.dataset.idx = idx;
+
+    const isCurrent = cycling && cycleIndex === idx;
+    if (isCurrent) card.classList.add('active');
+
+    card.innerHTML = `
+      <div class="bulb-icon" id="icon-${idx}">💡</div>
+      <div class="device-info">
+        <div class="device-name" id="name-${idx}">${esc(dev.friendly_name)}</div>
+        <div class="device-meta">${esc(dev.vendor)} ${esc(dev.model)}</div>
+        <div class="rename-form" id="rename-form-${idx}">
+          <input class="rename-input" id="rename-input-${idx}"
+                 type="text" value="${esc(dev.friendly_name)}"
+                 placeholder="New name…" />
+          <button class="btn-save" onclick="doRename(${idx})">Save</button>
+          <button class="btn-cancel" onclick="closeRename(${idx})">✕</button>
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="btn-sm btn-flash" id="flash-btn-${idx}"
+                onclick="flashOne(${idx})"
+                ${flashBusy ? 'disabled' : ''}>⚡ Flash</button>
+        <button class="btn-sm btn-rename" onclick="openRename(${idx})">✎ Rename</button>
+      </div>
+    `;
+    deviceList.appendChild(card);
+  });
+}
+
+function esc(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Flash single device ───────────────────────────────────────────────────────
+async function flashOne(idx) {
+  if (flashBusy) return;
+  flashBusy = true;
+  setStatus('flashing');
+
+  const dev = allDevices[idx];
+  const card = document.getElementById(`card-${idx}`);
+  card.classList.add('active');
+
+  disableAllFlashButtons(true);
+  btnStartCycle.disabled = true;
+
+  const res = await apiPost('/api/flash', { friendly_name: dev.friendly_name });
+  if (res.error) { toast(res.error, 'err'); }
+  else { toast(`Flashing ${dev.friendly_name}…`); }
+
+  // Poll until done
+  await pollFlashDone();
+
+  card.classList.remove('active');
+  flashBusy = false;
+  disableAllFlashButtons(false);
+  btnStartCycle.disabled = cycling;
+  setStatus('idle');
+}
+
+async function pollFlashDone() {
+  while (true) {
+    await sleep(700);
+    const s = await apiGet('/api/status');
+    if (!s.active_flash) break;
+  }
+}
+
+function disableAllFlashButtons(disabled) {
+  document.querySelectorAll('[id^="flash-btn-"]').forEach(b => b.disabled = disabled);
+}
+
+// ── Auto-cycle ────────────────────────────────────────────────────────────────
+function startCycle() {
+  cycling    = true;
+  cycleIndex = -1;
+  waitingThats = false;
+  cyclePanel.classList.add('visible');
+  btnStartCycle.disabled = true;
+  btnRefresh.disabled    = true;
+  nextCycle();
+}
+
+async function nextCycle() {
+  cycleIndex++;
+  if (cycleIndex >= allDevices.length) {
+    stopCycle();
+    toast('All bulbs cycled! 🎉', 'ok');
+    return;
+  }
+
+  const dev = allDevices[cycleIndex];
+  cycleCurrent.textContent  = dev.friendly_name;
+  cycleProgress.textContent = `${cycleIndex + 1} / ${allDevices.length}`;
+
+  renderDevices(); // highlight active card
+
+  // Scroll active card into view
+  const card = document.getElementById(`card-${cycleIndex}`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  // Trigger flash
+  flashBusy = true;
+  setStatus('flashing');
+  disableAllFlashButtons(true);
+
+  const res = await apiPost('/api/flash', { friendly_name: dev.friendly_name });
+  if (res.error) { toast(res.error, 'err'); }
+
+  // Wait for flash to complete
+  await pollFlashDone();
+
+  flashBusy = false;
+  setStatus('idle');
+  disableAllFlashButtons(false);
+
+  // Now wait for user action (That's it / Skip / Stop)
+  waitingThats = true;
+}
+
+function stopCycle() {
+  cycling = false;
+  cycleIndex = -1;
+  waitingThats = false;
+  cyclePanel.classList.remove('visible');
+  btnStartCycle.disabled = false;
+  btnRefresh.disabled    = false;
+  renderDevices();
+  setStatus('idle');
+}
+
+// ── Rename ────────────────────────────────────────────────────────────────────
+function openRename(idx) {
+  const form = document.getElementById(`rename-form-${idx}`);
+  form.classList.add('visible');
+  const input = document.getElementById(`rename-input-${idx}`);
+  input.focus();
+  input.select();
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') doRename(idx);
+    if (e.key === 'Escape') closeRename(idx);
+  };
+}
+
+function closeRename(idx) {
+  const form = document.getElementById(`rename-form-${idx}`);
+  form.classList.remove('visible');
+}
+
+async function doRename(idx) {
+  const dev      = allDevices[idx];
+  const input    = document.getElementById(`rename-input-${idx}`);
+  const newName  = input.value.trim();
+  if (!newName || newName === dev.friendly_name) { closeRename(idx); return; }
+
+  const res = await apiPost('/api/rename', { from: dev.friendly_name, to: newName });
+  if (res.error) {
+    toast('Rename failed: ' + res.error, 'err');
+  } else {
+    toast(`Renamed → ${newName}`, 'ok');
+    allDevices[idx].friendly_name = newName;
+
+    // Mark card as renamed
+    const card = document.getElementById(`card-${idx}`);
+    card.classList.add('renamed');
+
+    document.getElementById(`name-${idx}`).textContent = newName;
+    closeRename(idx);
+
+    // If cycling, update the panel
+    if (cycling && cycleIndex === idx) {
+      cycleCurrent.textContent = newName;
+    }
+  }
+}
+
+// ── Cycle button handlers ─────────────────────────────────────────────────────
+btnThatsIt.onclick = () => {
+  if (!waitingThats) return;
+  waitingThats = false;
+  // Open rename for current card
+  renderDevices();
+  openRename(cycleIndex);
+};
+
+btnSkip.onclick = () => {
+  if (!waitingThats) return;
+  waitingThats = false;
+  const card = document.getElementById(`card-${cycleIndex}`);
+  if (card) card.classList.remove('active');
+  nextCycle();
+};
+
+btnStopCycle.onclick = () => {
+  stopCycle();
+};
+
+btnStartCycle.onclick = startCycle;
+btnRefresh.onclick    = loadDevices;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+loadDevices();
+</script>
+</body>
+</html>
