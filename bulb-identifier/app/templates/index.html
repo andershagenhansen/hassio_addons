@@ -496,7 +496,8 @@
 <div id="toast"></div>
 
 <script>
-const BASE = '';
+// Derive base from current page URL so ingress proxying works correctly
+const BASE = window.location.pathname.replace(/\/+$/, '');
 
 // ── State ────────────────────────────────────────────────────────────────────
 let allDevices   = [];
