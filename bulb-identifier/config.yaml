@@ -1,0 +1,38 @@
+name: "Bulb Identifier"
+description: "Identify and rename Zigbee2MQTT bulbs by cycling through them one at a time."
+version: "1.0.0"
+slug: "bulb_identifier"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+
+startup: application
+boot: manual
+
+options:
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_user: "mqtt-user"
+  mqtt_password: "Velkommen1!"
+  flash_duration: 3
+  flash_cycles: 2
+
+schema:
+  mqtt_host: str
+  mqtt_port: int
+  mqtt_user: str
+  mqtt_password: str
+  flash_duration: int
+  flash_cycles: int
+
+ingress: true
+ingress_port: 8765
+panel_icon: "mdi:lightbulb-question"
+panel_title: "Bulb Identifier"
+
+map:
+  - config:r
