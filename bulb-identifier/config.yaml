@@ -1,6 +1,6 @@
 name: "Bulb Identifier"
 description: "Identify and rename Zigbee2MQTT bulbs by cycling through them one at a time."
-version: "1.0.0"
+version: "1.0.1"
 slug: "bulb_identifier"
 init: false
 arch:
