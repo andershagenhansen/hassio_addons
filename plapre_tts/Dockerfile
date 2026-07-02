@@ -12,7 +12,7 @@ RUN uv pip install --system --no-cache \
     torch --index-url https://download.pytorch.org/whl/cpu
 
 RUN uv pip install --system --no-cache \
-    "git+https://github.com/syv-ai/plapre.git" \
+    "git+https://github.com/syv-ai/plapre.git@bc8ad9ef61" \
     fastapi "uvicorn[standard]"
 
 WORKDIR /app
