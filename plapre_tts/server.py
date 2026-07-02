@@ -27,7 +27,7 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.14")
+app = FastAPI(title="Plapre TTS", version="1.0.15")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -112,6 +112,25 @@ def _install_plapre():
         subprocess.run(["git", "-C", src, "checkout", "bc8ad9ef61"], check=True)
         with open(os.path.join(src, "pyproject.toml"), "a") as f:
             f.write("\n[tool.hatch.metadata]\nallow-direct-references = true\n")
+        # Patch _build_prompt: tokenizer lacks </text>, <phonemes>, </phonemes> tokens
+        # so convert_tokens_to_ids returns None for them, which breaks torch.tensor().
+        inf = os.path.join(src, "plapre", "inference.py")
+        with open(inf) as f:
+            code = f.read()
+        code = code.replace(
+            "return (\n"
+            "            [text_start] + text_ids + [text_end]\n"
+            "            + [ph_start] + phone_ids + [ph_end, audio_start]\n"
+            "        )",
+            "return [\n"
+            "            x for x in\n"
+            "            [text_start] + text_ids + [text_end]\n"
+            "            + [ph_start] + phone_ids + [ph_end, audio_start]\n"
+            "            if x is not None\n"
+            "        ]",
+        )
+        with open(inf, "w") as f:
+            f.write(code)
         subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", src],
                        check=True)
     log.info("plapre installed successfully")
