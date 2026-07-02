@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plapre TTS</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:#0c1a27; --surface:#112030; --surface-2:#172d42; --border:#1d3550;
+  --accent:#38b2e8; --accent-dim:#1d6f96; --text:#cde4f4; --muted:#5e8faa;
+  --dim:#2e5570; --good:#3db87a; --warn:#d9924a; --bad:#d95f5f;
+  --font:system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:ui-monospace,'Cascadia Code','SF Mono',Consolas,monospace;
+}
+body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:14px; line-height:1.5; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+header { display:flex; align-items:center; gap:14px; padding:10px 18px; background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0; }
+.logo { font-size:15px; font-weight:700; letter-spacing:-.01em; }
+.logo b { color:var(--accent); }
+.status-pill { display:flex; align-items:center; gap:5px; font-size:11px; font-family:var(--mono); color:var(--muted); }
+.dot { width:6px; height:6px; border-radius:50%; background:var(--dim); transition:background .3s; }
+.dot.ok  { background:var(--good); box-shadow:0 0 5px var(--good); }
+.dot.err { background:var(--bad); }
+.header-stats { margin-left:auto; display:flex; gap:18px; }
+.stat { font-size:11px; font-family:var(--mono); color:var(--muted); display:flex; gap:5px; }
+.stat-label { color:var(--dim); }
+.stat-val { color:var(--text); font-variant-numeric:tabular-nums; }
+.layout { display:grid; grid-template-columns:360px 1fr; flex:1; overflow:hidden; }
+.synth { background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.panel-head { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); padding:12px 16px 8px; border-bottom:1px solid var(--border); }
+.synth-body { padding:14px; display:flex; flex-direction:column; gap:10px; flex:1; overflow-y:auto; }
+textarea { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--font); font-size:15px; line-height:1.65; padding:11px 12px; resize:none; height:110px; outline:none; transition:border-color .15s; }
+textarea:focus { border-color:var(--accent-dim); }
+textarea::placeholder { color:var(--dim); }
+.row-label { font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
+.speaker-row { display:flex; gap:5px; flex-wrap:wrap; }
+.spk-btn { padding:5px 11px; border-radius:3px; border:1px solid var(--border); background:transparent; color:var(--muted); font-family:var(--font); font-size:12px; cursor:pointer; transition:all .12s; }
+.spk-btn:hover { border-color:var(--accent-dim); color:var(--text); }
+.spk-btn.active { background:var(--accent-dim); border-color:var(--accent-dim); color:var(--text); }
+.speak-btn { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:10px; background:var(--accent); border:none; border-radius:3px; color:var(--bg); font-family:var(--font); font-size:13px; font-weight:700; cursor:pointer; transition:opacity .15s; }
+.speak-btn:hover { opacity:.88; }
+.speak-btn:disabled { opacity:.35; cursor:not-allowed; }
+.wave-wrap { background:var(--bg); border:1px solid var(--border); border-radius:3px; overflow:hidden; position:relative; }
+#wave { display:block; width:100%; height:64px; }
+.wave-tag { position:absolute; bottom:5px; right:8px; font-size:9px; font-family:var(--mono); color:var(--dim); }
+.cache-row { display:flex; align-items:center; gap:8px; font-size:11px; font-family:var(--mono); color:var(--muted); padding:7px 10px; background:var(--bg); border:1px solid var(--border); border-radius:3px; min-height:32px; }
+.badge { font-size:10px; padding:2px 6px; border-radius:2px; font-weight:700; letter-spacing:.04em; }
+.badge.hit  { background:rgba(61,184,122,.18); color:var(--good); }
+.badge.miss { background:rgba(217,146,74,.18); color:var(--warn); }
+.badge.idle { background:rgba(46,85,112,.3); color:var(--dim); }
+.badge.err  { background:rgba(217,95,95,.18); color:var(--bad); }
+.phrases { display:flex; flex-direction:column; overflow:hidden; }
+.tab-bar { display:flex; border-bottom:1px solid var(--border); background:var(--surface); padding:0 14px; flex-shrink:0; }
+.tab { padding:11px 14px; font-size:12px; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; user-select:none; transition:color .15s; display:flex; align-items:center; gap:6px; }
+.tab:hover { color:var(--text); }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.tab-n { font-size:10px; padding:1px 5px; border-radius:8px; background:var(--surface-2); color:var(--dim); font-variant-numeric:tabular-nums; }
+.pane { display:none; flex:1; overflow-y:auto; }
+.pane.active { display:block; }
+.phrase-list { padding:8px; display:flex; flex-direction:column; gap:1px; }
+.phrase-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:3px; cursor:pointer; border:1px solid transparent; transition:background .1s; }
+.phrase-row:hover { background:var(--surface-2); border-color:var(--border); }
+.phrase-row:hover .play-btn { opacity:1; }
+.phrase-text { flex:1; font-size:13.5px; color:var(--text); line-height:1.4; }
+.cached-dot { width:5px; height:5px; border-radius:50%; background:var(--dim); flex-shrink:0; transition:background .3s; }
+.cached-dot.yes { background:var(--good); }
+.play-btn { width:26px; height:26px; border-radius:50%; border:1px solid var(--border); background:var(--surface-2); color:var(--accent); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; flex-shrink:0; cursor:pointer; font-size:9px; }
+.play-btn:hover { background:var(--accent-dim); color:var(--text); }
+.play-btn.playing { opacity:1; background:var(--accent); color:var(--bg); }
+.stats-grid { padding:16px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:14px 16px; }
+.stat-card-label { font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); margin-bottom:6px; }
+.stat-card-val { font-size:26px; font-weight:700; font-family:var(--mono); color:var(--text); font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.stat-card-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+.info-block { margin:0 16px 16px; padding:12px 14px; background:var(--surface); border:1px solid var(--border); border-radius:4px; font-size:12px; color:var(--muted); line-height:1.7; font-family:var(--mono); }
+.info-block span { color:var(--text); }
+::-webkit-scrollbar { width:5px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><b>Plapre</b> TTS</div>
+  <div class="status-pill"><div class="dot" id="status-dot"></div><span id="status-text">connecting…</span></div>
+  <div class="header-stats">
+    <div class="stat"><span class="stat-label">model</span><span class="stat-val" id="h-model">—</span></div>
+    <div class="stat"><span class="stat-label">cached</span><span class="stat-val" id="h-cached">—</span></div>
+    <div class="stat"><span class="stat-label">speaker</span><span class="stat-val" id="h-speaker">—</span></div>
+  </div>
+</header>
+<div class="layout">
+  <div class="synth">
+    <div class="panel-head">Synthesiser</div>
+    <div class="synth-body">
+      <div>
+        <div class="row-label">Text</div>
+        <textarea id="tts-input" placeholder="Skriv dansk tekst her…"></textarea>
+      </div>
+      <div>
+        <div class="row-label">Stemme</div>
+        <div class="speaker-row" id="speaker-row"></div>
+      </div>
+      <div class="wave-wrap">
+        <canvas id="wave" width="700" height="128"></canvas>
+        <div class="wave-tag" id="wave-tag">—</div>
+      </div>
+      <button class="speak-btn" id="speak-btn" disabled>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg>
+        Syntetisér
+      </button>
+      <div class="cache-row">
+        <span class="badge idle" id="cache-badge">IDLE</span>
+        <span id="cache-msg">Ingen anmodning endnu</span>
+      </div>
+    </div>
+  </div>
+  <div class="phrases">
+    <div class="tab-bar">
+      <div class="tab active" data-tab="defaults">Standard sætninger <span class="tab-n" id="tab-n-defaults">…</span></div>
+      <div class="tab" data-tab="stats">Status</div>
+    </div>
+    <div class="pane active" id="pane-defaults">
+      <div class="phrase-list" id="phrase-list"><div style="padding:30px 16px;color:var(--dim);font-size:13px;">Henter sætninger…</div></div>
+    </div>
+    <div class="pane" id="pane-stats">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-card-label">Cachet lyd</div><div class="stat-card-val" id="sc-cached">—</div><div class="stat-card-sub">WAV filer i /data/phrases</div></div>
+        <div class="stat-card"><div class="stat-card-label">Standard sætninger</div><div class="stat-card-val" id="sc-phrases">—</div><div class="stat-card-sub">Forud-definerede fraser</div></div>
+        <div class="stat-card"><div class="stat-card-label">Model</div><div class="stat-card-val" style="font-size:13px;padding-top:4px" id="sc-model">—</div><div class="stat-card-sub">HuggingFace repo</div></div>
+        <div class="stat-card"><div class="stat-card-label">Standard stemme</div><div class="stat-card-val" id="sc-speaker">—</div><div class="stat-card-sub">Kan ændres i indstillinger</div></div>
+      </div>
+      <div class="info-block"><div>cache <span>/data/phrases/</span></div><div>hf <span>/data/hf_cache/</span></div></div>
+    </div>
+  </div>
+</div>
+<script>
+// Use relative URLs so it works both directly and through HAOS ingress proxy
+const BASE = '';
+let activeSpeaker = 'ida';
+let audioCtx = null, analyser = null, animFrame = null, currentSource = null;
+let phraseCache = {};
+
+const canvas = document.getElementById('wave');
+const ctx2d = canvas.getContext('2d');
+
+function drawIdle() {
+  const W = canvas.offsetWidth * devicePixelRatio, H = canvas.offsetHeight * devicePixelRatio;
+  canvas.width = W; canvas.height = H;
+  ctx2d.clearRect(0,0,W,H);
+  ctx2d.strokeStyle = 'rgba(46,85,112,0.7)'; ctx2d.lineWidth = 1;
+  ctx2d.beginPath(); ctx2d.moveTo(0,H/2); ctx2d.lineTo(W,H/2); ctx2d.stroke();
+}
+function drawLive() {
+  if (!analyser) return;
+  const W = canvas.offsetWidth * devicePixelRatio, H = canvas.offsetHeight * devicePixelRatio;
+  if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  ctx2d.clearRect(0,0,W,H);
+  ctx2d.strokeStyle = '#38b2e8'; ctx2d.lineWidth = Math.max(1, W/700);
+  ctx2d.beginPath();
+  const slice = W / buf.length; let x = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const y = ((buf[i]+1)/2)*H;
+    i===0 ? ctx2d.moveTo(x,y) : ctx2d.lineTo(x,y); x += slice;
+  }
+  ctx2d.stroke();
+  animFrame = requestAnimationFrame(drawLive);
+}
+function stopAnim() { if (animFrame) { cancelAnimationFrame(animFrame); animFrame = null; } drawIdle(); }
+
+async function playWav(arrayBuffer, onEnd) {
+  if (!audioCtx) audioCtx = new AudioContext();
+  if (currentSource) { try { currentSource.stop(); } catch(e){} }
+  if (analyser) analyser.disconnect();
+  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+  analyser = audioCtx.createAnalyser(); analyser.fftSize = 2048;
+  currentSource = audioCtx.createBufferSource();
+  currentSource.buffer = decoded;
+  currentSource.connect(analyser); analyser.connect(audioCtx.destination);
+  currentSource.start(0);
+  currentSource.onended = () => { stopAnim(); onEnd && onEnd(); };
+  drawLive();
+}
+
+async function synthesise(text, voice) {
+  const r = await fetch(`${BASE}/v1/audio/speech`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({input:text, voice})
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return { buf: await r.arrayBuffer(), cacheHit: r.headers.get('X-Cache') === 'HIT' };
+}
+
+function setCacheStatus(type, msg) {
+  const badge = document.getElementById('cache-badge');
+  badge.className = 'badge ' + type;
+  badge.textContent = {hit:'HIT',miss:'MISS',idle:'…',err:'ERR'}[type] ?? type.toUpperCase();
+  document.getElementById('cache-msg').textContent = msg;
+}
+
+function getWavDuration(buf) {
+  try {
+    const v = new DataView(buf);
+    return v.getUint32(40,true) / (v.getUint32(24,true) * v.getUint16(22,true) * (v.getUint16(34,true)/8));
+  } catch(e) { return null; }
+}
+
+async function init() {
+  try {
+    const h = await (await fetch(`${BASE}/health`)).json();
+    document.getElementById('status-dot').className = 'dot ok';
+    document.getElementById('status-text').textContent = 'online';
+    document.getElementById('h-model').textContent = h.model?.split('/')[1] ?? h.model;
+    document.getElementById('h-cached').textContent = h.cached_phrases;
+    document.getElementById('h-speaker').textContent = h.default_speaker;
+    document.getElementById('sc-cached').textContent = h.cached_phrases;
+    document.getElementById('sc-model').textContent = h.model?.split('/')[1] ?? h.model;
+    document.getElementById('sc-speaker').textContent = h.default_speaker;
+    activeSpeaker = h.default_speaker ?? 'ida';
+  } catch(e) {
+    document.getElementById('status-dot').className = 'dot err';
+    document.getElementById('status-text').textContent = 'offline';
+  }
+
+  try {
+    const s = await (await fetch(`${BASE}/v1/speakers`)).json();
+    activeSpeaker = s.default ?? 'ida';
+    const row = document.getElementById('speaker-row'); row.innerHTML = '';
+    s.speakers.forEach(sp => {
+      const btn = document.createElement('button');
+      btn.className = 'spk-btn' + (sp === activeSpeaker ? ' active' : '');
+      btn.textContent = sp.charAt(0).toUpperCase() + sp.slice(1);
+      btn.onclick = () => { activeSpeaker = sp; row.querySelectorAll('.spk-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
+      row.appendChild(btn);
+    });
+  } catch(e) {}
+
+  try {
+    const p = await (await fetch(`${BASE}/v1/phrases`)).json();
+    document.getElementById('sc-phrases').textContent = p.count;
+    document.getElementById('tab-n-defaults').textContent = p.count;
+    renderPhrases(p.phrases);
+  } catch(e) {
+    document.getElementById('phrase-list').innerHTML = '<div style="padding:30px 16px;color:var(--bad);font-size:13px;">Kunne ikke hente sætninger</div>';
+  }
+
+  document.getElementById('speak-btn').disabled = false;
+  drawIdle();
+}
+
+function renderPhrases(phrases) {
+  const list = document.getElementById('phrase-list'); list.innerHTML = '';
+  phrases.forEach(ph => {
+    const row = document.createElement('div'); row.className = 'phrase-row';
+    const dot = document.createElement('div'); dot.className = 'cached-dot' + (phraseCache[ph] ? ' yes' : '');
+    const textDiv = document.createElement('div'); textDiv.style.flex = '1';
+    const txt = document.createElement('div'); txt.className = 'phrase-text'; txt.textContent = ph;
+    textDiv.appendChild(txt);
+    const playBtn = document.createElement('button'); playBtn.className = 'play-btn';
+    playBtn.innerHTML = '<svg width="8" height="9" viewBox="0 0 8 9" fill="currentColor"><polygon points="1,0.5 7.5,4.5 1,8.5"/></svg>';
+    row.appendChild(dot); row.appendChild(textDiv); row.appendChild(playBtn);
+    textDiv.onclick = () => { document.getElementById('tts-input').value = ph; };
+    playBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (playBtn.classList.contains('playing')) return;
+      playBtn.classList.add('playing');
+      playBtn.innerHTML = '<svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor"><rect x="1" y="1" width="2.5" height="7"/><rect x="5.5" y="1" width="2.5" height="7"/></svg>';
+      try {
+        const {buf, cacheHit} = await synthesise(ph, activeSpeaker);
+        phraseCache[ph] = true; dot.classList.add('yes');
+        await playWav(buf, () => {
+          playBtn.classList.remove('playing');
+          playBtn.innerHTML = '<svg width="8" height="9" viewBox="0 0 8 9" fill="currentColor"><polygon points="1,0.5 7.5,4.5 1,8.5"/></svg>';
+        });
+      } catch(err) {
+        playBtn.classList.remove('playing');
+        playBtn.innerHTML = '<svg width="8" height="9" viewBox="0 0 8 9" fill="currentColor"><polygon points="1,0.5 7.5,4.5 1,8.5"/></svg>';
+      }
+    };
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('speak-btn').onclick = async () => {
+  const text = document.getElementById('tts-input').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('speak-btn');
+  btn.disabled = true; btn.textContent = 'Synthesising…';
+  setCacheStatus('idle', 'Sender anmodning…');
+  try {
+    const {buf, cacheHit} = await synthesise(text, activeSpeaker);
+    setCacheStatus(cacheHit ? 'hit' : 'miss', cacheHit ? 'Hentet fra cache' : 'Ny syntese');
+    const dur = getWavDuration(buf);
+    document.getElementById('wave-tag').textContent = dur ? `${dur.toFixed(1)}s` : '';
+    await playWav(buf, () => {
+      btn.disabled = false;
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg> Syntetisér';
+    });
+    try { const h = await (await fetch(`${BASE}/health`)).json(); document.getElementById('h-cached').textContent = h.cached_phrases; document.getElementById('sc-cached').textContent = h.cached_phrases; } catch(e){}
+  } catch(err) {
+    setCacheStatus('err', err.message);
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><polygon points="2,1 11,6 2,11"/></svg> Syntetisér';
+  }
+};
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+  };
+});
+
+document.getElementById('tts-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) document.getElementById('speak-btn').click();
+});
+
+init();
+</script>
+</body>
+</html>
