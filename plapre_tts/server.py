@@ -27,7 +27,7 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.8")
+app = FastAPI(title="Plapre TTS", version="1.0.9")
 tts = None  # initialised on first boot after plapre install
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
