@@ -1,3 +1,6 @@
+## 1.0.21
+- Fix: voice clone upload now decodes any audio format (MP3, OGG, FLAC, …) via torchaudio before extracting the speaker embedding — previously the raw bytes were saved with a .wav extension and passed directly, causing silent failures or crashes on non-WAV uploads
+
 ## 1.0.20
 - Add voice cloning ("Stemmekloning") tab in the web UI — upload a WAV/MP3 clip to clone a speaker via Kanade's global embedding; cloned speakers are persisted in /data/cloned_speakers/ and survive restarts; delete cloned speakers from the UI; cloned voices appear immediately in the main speaker row
 

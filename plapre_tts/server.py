@@ -28,7 +28,7 @@ CLONED_DIR = Path("/data/cloned_speakers")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.20")
+app = FastAPI(title="Plapre TTS", version="1.0.21")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -256,11 +256,23 @@ async def clone_speaker(name: str, file: UploadFile = File(...)):
     if not name:
         raise HTTPException(400, "name is empty")
     content = await file.read()
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+    # Write with original extension so torchaudio picks the right decoder
+    orig_ext = Path(file.filename).suffix.lower() if file.filename else ".wav"
+    with tempfile.NamedTemporaryFile(suffix=orig_ext, delete=False) as tmp:
         tmp.write(content)
-        tmp_path = tmp.name
+        raw_path = tmp.name
+    tmp_path = raw_path
     try:
-        import torch
+        import torch, torchaudio
+        # Decode whatever format was uploaded and resave as 24kHz mono WAV
+        waveform, sr = torchaudio.load(raw_path)
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(0, keepdim=True)
+        if sr != 24000:
+            waveform = torchaudio.functional.resample(waveform, sr, 24000)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wav_tmp:
+            tmp_path = wav_tmp.name
+        torchaudio.save(tmp_path, waveform, 24000)
         emb = tts._extract_speaker_emb(tmp_path)
         CLONED_DIR.mkdir(parents=True, exist_ok=True)
         (CLONED_DIR / f"{name}.json").write_text(json.dumps(emb.tolist()))
@@ -273,7 +285,9 @@ async def clone_speaker(name: str, file: UploadFile = File(...)):
         log.exception("voice cloning failed")
         raise HTTPException(500, str(exc))
     finally:
-        os.unlink(tmp_path)
+        for p in {raw_path, tmp_path}:
+            try: os.unlink(p)
+            except OSError: pass
 
 
 @app.get("/v1/cloned-speakers")
