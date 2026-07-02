@@ -27,7 +27,7 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.15")
+app = FastAPI(title="Plapre TTS", version="1.0.16")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -84,7 +84,7 @@ def _synthesize(text: str, speaker: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 def _pregenerate_phrases():
-    speakers = [SPEAKER]  # pre-generate for the default speaker
+    speakers = SPEAKERS  # pre-generate for all voices
     total = len(DEFAULT_PHRASES) * len(speakers)
     done = 0
     for spk in speakers:
