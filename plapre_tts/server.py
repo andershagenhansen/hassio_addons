@@ -1,11 +1,10 @@
-import hashlib, io, json, logging, os, struct, threading
+import hashlib, io, json, logging, os, struct, subprocess, sys, tempfile, threading
 from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
-from plapre import Plapre
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("plapre")
@@ -28,11 +27,8 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-log.info(f"Loading model: {MODEL}")
-tts = Plapre(MODEL)
-log.info("Model ready")
-
-app = FastAPI(title="Plapre TTS", version="1.0.0")
+app = FastAPI(title="Plapre TTS", version="1.0.8")
+tts = None  # initialised on first boot after plapre install
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -67,6 +63,8 @@ def _get_cached(text: str, speaker: str) -> bytes | None:
 
 
 def _synthesize(text: str, speaker: str) -> bytes:
+    if tts is None:
+        raise RuntimeError("Model not ready yet — still initialising")
     audio = tts.speak(text, speaker=speaker)
     if isinstance(audio, tuple):
         audio = audio[0]
@@ -98,9 +96,33 @@ def _pregenerate_phrases():
     log.info(f"Pre-generation complete — {total} phrases cached in {CACHE_DIR}")
 
 
+def _install_plapre():
+    try:
+        import plapre  # noqa
+        return
+    except ImportError:
+        pass
+    log.info("First boot: installing plapre (this takes ~30s)…")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = os.path.join(tmp, "plapre")
+        subprocess.run(["git", "clone", "https://github.com/syv-ai/plapre.git", src], check=True)
+        subprocess.run(["git", "-C", src, "checkout", "bc8ad9ef61"], check=True)
+        with open(os.path.join(src, "pyproject.toml"), "a") as f:
+            f.write("\n[tool.hatch.metadata]\nallow-direct-references = true\n")
+        subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir",
+                        "--no-build-isolation", src], check=True)
+    log.info("plapre installed successfully")
+
+
 @app.on_event("startup")
 async def startup():
+    global tts
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    _install_plapre()
+    from plapre import Plapre
+    log.info(f"Loading model: {MODEL}")
+    tts = Plapre(MODEL)
+    log.info("Model ready")
     threading.Thread(target=_pregenerate_phrases, daemon=True, name="pre-gen").start()
 
 
