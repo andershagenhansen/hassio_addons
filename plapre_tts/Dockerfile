@@ -11,9 +11,14 @@ RUN pip install --no-cache-dir uv
 RUN uv pip install --system --no-cache \
     torch --index-url https://download.pytorch.org/whl/cpu
 
-RUN uv pip install --system --no-cache \
-    "git+https://github.com/syv-ai/plapre.git@bc8ad9ef61" \
-    fastapi "uvicorn[standard]"
+RUN git clone https://github.com/syv-ai/plapre.git /tmp/plapre_src \
+    && cd /tmp/plapre_src \
+    && git checkout bc8ad9ef61 \
+    && printf '\n[tool.hatch.metadata]\nallow-direct-references = true\n' >> pyproject.toml \
+    && uv pip install --system --no-cache . \
+    && rm -rf /tmp/plapre_src
+
+RUN uv pip install --system --no-cache fastapi "uvicorn[standard]"
 
 WORKDIR /app
 COPY server.py .
