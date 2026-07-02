@@ -27,7 +27,7 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.9")
+app = FastAPI(title="Plapre TTS", version="1.0.10")
 tts = None  # initialised on first boot after plapre install
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -109,8 +109,8 @@ def _install_plapre():
         subprocess.run(["git", "-C", src, "checkout", "bc8ad9ef61"], check=True)
         with open(os.path.join(src, "pyproject.toml"), "a") as f:
             f.write("\n[tool.hatch.metadata]\nallow-direct-references = true\n")
-        subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir",
-                        "--no-build-isolation", src], check=True)
+        subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", src],
+                       check=True)
     log.info("plapre installed successfully")
 
 
