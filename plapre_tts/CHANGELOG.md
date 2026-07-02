@@ -1,3 +1,6 @@
+## 1.0.15
+- Fix: patch plapre's _build_prompt during install — tokenizer lacks </text>, <phonemes>, </phonemes> tokens so convert_tokens_to_ids returns None for them, which breaks torch.tensor(); filter None from prompt_ids before tensor creation
+
 ## 1.0.14
 - Fix: install espeak-ng — required by plapre for phonemization
 
