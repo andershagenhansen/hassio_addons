@@ -27,7 +27,7 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.17")
+app = FastAPI(title="Plapre TTS", version="1.0.18")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -112,23 +112,71 @@ def _install_plapre():
         subprocess.run(["git", "-C", src, "checkout", "bc8ad9ef61"], check=True)
         with open(os.path.join(src, "pyproject.toml"), "a") as f:
             f.write("\n[tool.hatch.metadata]\nallow-direct-references = true\n")
-        # Patch _build_prompt: tokenizer lacks </text>, <phonemes>, </phonemes> tokens
-        # so convert_tokens_to_ids returns None for them, which breaks torch.tensor().
+        # Patch inference.py: with the transformers 5.x TokenizersBackend tokenizer,
+        # convert_tokens_to_ids() returns None for the model's added special tokens
+        # (<text>, </audio>, <audio_0>, <phone_*>, …). get_vocab() resolves them
+        # reliably. Passing None into generate(eos_token_id=…) or torch.tensor()
+        # otherwise crashes with "NoneType cannot be interpreted as an integer".
         inf = os.path.join(src, "plapre", "inference.py")
         with open(inf) as f:
             code = f.read()
-        code = code.replace(
-            "return (\n"
-            "            [text_start] + text_ids + [text_end]\n"
-            "            + [ph_start] + phone_ids + [ph_end, audio_start]\n"
-            "        )",
-            "return [\n"
-            "            x for x in\n"
-            "            [text_start] + text_ids + [text_end]\n"
-            "            + [ph_start] + phone_ids + [ph_end, audio_start]\n"
-            "            if x is not None\n"
-            "        ]",
-        )
+
+        patches = [
+            (
+                '        self.audio_token_start = self.tokenizer.convert_tokens_to_ids("<audio_0>")\n'
+                '        self.audio_token_end = self.tokenizer.convert_tokens_to_ids("<audio_12799>")\n'
+                '        self.audio_end_id = self.tokenizer.convert_tokens_to_ids("</audio>")\n'
+                '        self.eos_id = self.tokenizer.eos_token_id',
+                '        self._vocab = self.tokenizer.get_vocab()\n'
+                '        self.audio_token_start = self._vocab.get("<audio_0>")\n'
+                '        self.audio_token_end = self._vocab.get("<audio_12799>")\n'
+                '        self.audio_end_id = self._vocab.get("</audio>")\n'
+                '        self.eos_id = self.tokenizer.eos_token_id',
+            ),
+            (
+                '        for c in phonemes:\n'
+                '            tid = tok.convert_tokens_to_ids(f"<phone_{c}>")\n'
+                '            if tid != tok.unk_token_id:\n'
+                '                phone_ids.append(tid)',
+                '        for c in phonemes:\n'
+                '            tid = self._vocab.get(f"<phone_{c}>")\n'
+                '            if tid is not None:\n'
+                '                phone_ids.append(tid)',
+            ),
+            (
+                '        text_start = tok.convert_tokens_to_ids("<text>")\n'
+                '        text_end = tok.convert_tokens_to_ids("</text>")\n'
+                '        ph_start = tok.convert_tokens_to_ids("<phonemes>")\n'
+                '        ph_end = tok.convert_tokens_to_ids("</phonemes>")\n'
+                '        audio_start = tok.convert_tokens_to_ids("<audio>")',
+                '        text_start = self._vocab.get("<text>")\n'
+                '        text_end = self._vocab.get("</text>")\n'
+                '        ph_start = self._vocab.get("<phonemes>")\n'
+                '        ph_end = self._vocab.get("</phonemes>")\n'
+                '        audio_start = self._vocab.get("<audio>")',
+            ),
+            (
+                "        return (\n"
+                "            [text_start] + text_ids + [text_end]\n"
+                "            + [ph_start] + phone_ids + [ph_end, audio_start]\n"
+                "        )",
+                "        return [\n"
+                "            x for x in\n"
+                "            [text_start] + text_ids + [text_end]\n"
+                "            + [ph_start] + phone_ids + [ph_end, audio_start]\n"
+                "            if x is not None\n"
+                "        ]",
+            ),
+            (
+                "                eos_token_id=[self.audio_end_id, self.eos_id],",
+                "                eos_token_id=[i for i in [self.audio_end_id, self.eos_id] if i is not None],",
+            ),
+        ]
+        for old, new in patches:
+            if old not in code:
+                raise RuntimeError(f"plapre patch anchor not found:\n{old[:80]}…")
+            code = code.replace(old, new)
+
         with open(inf, "w") as f:
             f.write(code)
         subprocess.run([sys.executable, "-m", "pip", "install", "--no-cache-dir", src],

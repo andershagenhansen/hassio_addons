@@ -1,5 +1,9 @@
+## 1.0.18
+- Fix: synthesis now works — with the transformers 5.x TokenizersBackend tokenizer, convert_tokens_to_ids() returns None for pico's added special tokens; patch inference.py to resolve all token IDs via get_vocab() and guard against None in generate(eos_token_id=…); verified with Docker: 135/135 phrases generated, zero failures
+- Fix: pre-install transformers>=5.0.0 in Dockerfile to ensure correct version is present at first-boot plapre install time
+
 ## 1.0.17
-- Fix: pre-install transformers~=4.48.0 in Dockerfile so plapre's pip install doesn't pull transformers 5.12.1 (breaking API changes broke model.generate() call)
+- (superseded) attempted transformers~=4.48.0 pin — reverted; model tokenizer requires transformers 5.x
 - Fix: log full tracebacks from pre-gen failures (exc_info=True) so synthesis errors are visible
 
 ## 1.0.16
