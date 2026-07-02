@@ -27,7 +27,7 @@ CACHE_DIR = Path("/data/phrases")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.16")
+app = FastAPI(title="Plapre TTS", version="1.0.17")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -94,7 +94,7 @@ def _pregenerate_phrases():
                 try:
                     _synthesize(phrase, spk)
                 except Exception as exc:
-                    log.warning(f"Pre-gen failed for {phrase!r}: {exc}")
+                    log.warning(f"Pre-gen failed for {phrase!r}: {exc}", exc_info=True)
             done += 1
     log.info(f"Pre-generation complete — {total} phrases cached in {CACHE_DIR}")
 

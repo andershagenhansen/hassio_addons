@@ -1,3 +1,7 @@
+## 1.0.17
+- Fix: pre-install transformers~=4.48.0 in Dockerfile so plapre's pip install doesn't pull transformers 5.12.1 (breaking API changes broke model.generate() call)
+- Fix: log full tracebacks from pre-gen failures (exc_info=True) so synthesis errors are visible
+
 ## 1.0.16
 - Speaker is now a dropdown select in HA (tor|ida|liv|ask|kaj) instead of a free-text field
 - Pre-generation now runs for all 5 voices at startup (135 phrases total)
