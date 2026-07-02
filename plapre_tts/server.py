@@ -18,6 +18,9 @@ if os.path.exists("/data/options.json"):
 
 MODEL   = _opts.get("model",   os.getenv("PLAPRE_MODEL",   "syvai/plapre-pico"))
 SPEAKER = _opts.get("speaker", os.getenv("PLAPRE_SPEAKER", "ida"))
+HF_TOKEN = _opts.get("hf_token", os.getenv("HF_TOKEN", ""))
+if HF_TOKEN:
+    os.environ["HF_TOKEN"] = HF_TOKEN
 SPEAKERS = ["tor", "ida", "liv", "ask", "kaj"]
 CACHE_DIR = Path("/data/phrases")
 
