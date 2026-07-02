@@ -9,13 +9,13 @@ RUN pip install --no-cache-dir uv
 
 # Install plapre and its dependencies (PyTorch CPU-only to keep image lean)
 RUN uv pip install --system --no-cache \
-    torch --index-url https://download.pytorch.org/whl/cpu
+    torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 RUN git clone https://github.com/syv-ai/plapre.git /tmp/plapre_src \
     && cd /tmp/plapre_src \
     && git checkout bc8ad9ef61 \
     && printf '\n[tool.hatch.metadata]\nallow-direct-references = true\n' >> pyproject.toml \
-    && uv pip install --system --no-cache . \
+    && uv pip install --system --no-cache --no-build-isolation . \
     && rm -rf /tmp/plapre_src
 
 RUN uv pip install --system --no-cache fastapi "uvicorn[standard]"
