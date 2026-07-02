@@ -1,3 +1,10 @@
+## 1.0.8
+- Fix: copy phrases.json into Docker image so pre-generation actually runs on startup
+- Fix: defer plapre install to first boot — Docker build is now ~30s faster
+
+## 1.0.7
+- (skipped)
+
 ## 1.0.6
 - Fix: install hatchling before plapre so --no-build-isolation works correctly
 
