@@ -17,6 +17,8 @@ map:
 options:
   model: "syvai/plapre-pico"
   speaker: "ida"
+  hf_token: ""
 schema:
   model: str
   speaker: str
+  hf_token: str
