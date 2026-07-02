@@ -1,5 +1,5 @@
 name: "Plapre TTS"
-version: "1.0.10"
+version: "1.0.11"
 slug: "plapre_tts_server"
 description: "Danish neural TTS — syvai/plapre-pico running locally on CPU"
 url: "https://huggingface.co/syvai/plapre-pico"
@@ -17,7 +17,6 @@ map:
 options:
   model: "syvai/plapre-pico"
   speaker: "ida"
-  hf_token: ""
 schema:
   model: str
   speaker: str
