@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -20,15 +20,16 @@ SPEAKER = _opts.get("speaker", os.getenv("PLAPRE_SPEAKER", "ida"))
 HF_TOKEN = _opts.get("hf_token", os.getenv("HF_TOKEN", ""))
 if HF_TOKEN:
     os.environ["HF_TOKEN"] = HF_TOKEN
-SPEAKERS = ["tor", "ida", "liv", "ask", "kaj"]
+SPEAKERS = ["tor", "ida", "liv", "ask", "kaj"]  # updated after startup
 CACHE_DIR = Path("/data/phrases")
 
 # Load pre-defined phrases
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.11")
-tts = None  # initialised on first boot after plapre install
+app = FastAPI(title="Plapre TTS", version="1.0.12")
+tts = None          # initialised on first boot after plapre install
+speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -63,9 +64,11 @@ def _get_cached(text: str, speaker: str) -> bytes | None:
 
 
 def _synthesize(text: str, speaker: str) -> bytes:
+    import torch
     if tts is None:
         raise RuntimeError("Model not ready yet — still initialising")
-    audio = tts.speak(text, speaker=speaker)
+    emb = speaker_embs.get(speaker)
+    audio = tts.speak(text, speaker_emb=emb)
     if isinstance(audio, tuple):
         audio = audio[0]
     wav = _to_wav(audio)
@@ -114,14 +117,27 @@ def _install_plapre():
     log.info("plapre installed successfully")
 
 
+def _load_speaker_embs():
+    import torch
+    from huggingface_hub import hf_hub_download
+    log.info("Loading speaker embeddings…")
+    path = hf_hub_download(MODEL, "speakers.json")
+    raw = json.loads(Path(path).read_text())
+    return {name: torch.tensor(vec, dtype=torch.float32) for name, vec in raw.items()}
+
+
 @app.on_event("startup")
 async def startup():
-    global tts
+    global tts, speaker_embs
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     _install_plapre()
     from plapre import Plapre
     log.info(f"Loading model: {MODEL}")
     tts = Plapre(MODEL)
+    speaker_embs = _load_speaker_embs()
+    SPEAKERS.clear()
+    SPEAKERS.extend(speaker_embs.keys())
+    log.info(f"Speakers loaded: {SPEAKERS}")
     log.info("Model ready")
     threading.Thread(target=_pregenerate_phrases, daemon=True, name="pre-gen").start()
 
@@ -133,6 +149,11 @@ async def startup():
 class SpeechRequest(BaseModel):
     input: str
     voice: str = "ida"
+
+
+@app.get("/")
+def root():
+    return RedirectResponse("/docs")
 
 
 @app.get("/health")
