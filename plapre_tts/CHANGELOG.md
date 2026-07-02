@@ -1,3 +1,6 @@
+## 1.0.6
+- Fix: install hatchling before plapre so --no-build-isolation works correctly
+
 ## 1.0.5
 - Fix: install torchaudio from PyTorch CPU wheel index to avoid missing CUDA library crash
 
