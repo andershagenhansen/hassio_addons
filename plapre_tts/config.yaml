@@ -1,0 +1,22 @@
+name: "Plapre TTS"
+version: "1.0.0"
+slug: "plapre_tts_server"
+description: "Danish neural TTS — syvai/plapre-pico running locally on CPU"
+url: "https://huggingface.co/syvai/plapre-pico"
+arch:
+  - amd64
+startup: services
+boot: auto
+init: false
+ports:
+  8000/tcp: 8000
+ports_description:
+  8000/tcp: "Plapre REST API"
+map:
+  - data:rw
+options:
+  model: "syvai/plapre-pico"
+  speaker: "ida"
+schema:
+  model: str
+  speaker: str
