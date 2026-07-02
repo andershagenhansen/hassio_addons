@@ -1,3 +1,6 @@
+## 1.0.20
+- Add voice cloning ("Stemmekloning") tab in the web UI — upload a WAV/MP3 clip to clone a speaker via Kanade's global embedding; cloned speakers are persisted in /data/cloned_speakers/ and survive restarts; delete cloned speakers from the UI; cloned voices appear immediately in the main speaker row
+
 ## 1.0.19
 - Fix: UI API calls now work through HAOS ingress — derive BASE from window.location.pathname so fetch paths include the ingress prefix (e.g. /abc123_plapre_tts_server/v1/audio/speech) instead of hitting the HA root
 

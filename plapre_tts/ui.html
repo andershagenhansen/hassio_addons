@@ -74,6 +74,30 @@ textarea::placeholder { color:var(--dim); }
 .stat-card-sub { font-size:11px; color:var(--muted); margin-top:3px; }
 .info-block { margin:0 16px 16px; padding:12px 14px; background:var(--surface); border:1px solid var(--border); border-radius:4px; font-size:12px; color:var(--muted); line-height:1.7; font-family:var(--mono); }
 .info-block span { color:var(--text); }
+.clone-pane { padding:16px; display:flex; flex-direction:column; gap:14px; }
+.clone-upload { border:1.5px dashed var(--border); border-radius:4px; padding:18px 16px; display:flex; flex-direction:column; gap:10px; transition:border-color .15s; }
+.clone-upload:hover { border-color:var(--accent-dim); }
+.clone-name { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:3px; color:var(--text); font-family:var(--font); font-size:13px; padding:7px 10px; outline:none; transition:border-color .15s; }
+.clone-name:focus { border-color:var(--accent-dim); }
+.clone-name::placeholder { color:var(--dim); }
+.file-label { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12px; color:var(--muted); }
+.file-label:hover { color:var(--text); }
+.file-label input { display:none; }
+.file-chosen { font-size:11px; font-family:var(--mono); color:var(--accent); margin-top:2px; min-height:16px; }
+.clone-btn { padding:8px 14px; background:var(--accent-dim); border:1px solid var(--accent-dim); border-radius:3px; color:var(--text); font-family:var(--font); font-size:12px; font-weight:600; cursor:pointer; transition:opacity .15s; align-self:flex-start; }
+.clone-btn:hover { opacity:.85; }
+.clone-btn:disabled { opacity:.35; cursor:not-allowed; }
+.clone-hint { font-size:11px; color:var(--muted); line-height:1.6; }
+.clone-hint b { color:var(--text); font-weight:600; }
+.clone-list-head { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+.clone-list { display:flex; flex-direction:column; gap:4px; }
+.clone-item { display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--surface); border:1px solid var(--border); border-radius:3px; }
+.clone-item-name { flex:1; font-size:13px; color:var(--text); }
+.clone-del { padding:3px 8px; border:1px solid var(--border); background:transparent; border-radius:2px; color:var(--muted); font-size:11px; cursor:pointer; transition:all .12s; }
+.clone-del:hover { border-color:var(--bad); color:var(--bad); }
+.clone-status { font-size:12px; font-family:var(--mono); min-height:18px; }
+.clone-status.ok { color:var(--good); }
+.clone-status.err { color:var(--bad); }
 ::-webkit-scrollbar { width:5px; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
@@ -118,10 +142,34 @@ textarea::placeholder { color:var(--dim); }
   <div class="phrases">
     <div class="tab-bar">
       <div class="tab active" data-tab="defaults">Standard sætninger <span class="tab-n" id="tab-n-defaults">…</span></div>
+      <div class="tab" data-tab="clone">Stemmekloning</div>
       <div class="tab" data-tab="stats">Status</div>
     </div>
     <div class="pane active" id="pane-defaults">
       <div class="phrase-list" id="phrase-list"><div style="padding:30px 16px;color:var(--dim);font-size:13px;">Henter sætninger…</div></div>
+    </div>
+    <div class="pane" id="pane-clone">
+      <div class="clone-pane">
+        <div class="clone-upload">
+          <div class="row-label">Nyt stemme-klip</div>
+          <input class="clone-name" id="clone-name" type="text" placeholder="Navn (fx Anders)" maxlength="32">
+          <label class="file-label">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 1v8M4 4l3-3 3 3M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/></svg>
+            Vælg lydfil (WAV/MP3)…
+            <input type="file" id="clone-file" accept="audio/*">
+          </label>
+          <div class="file-chosen" id="clone-file-name"></div>
+          <button class="clone-btn" id="clone-btn" disabled>Klon stemme</button>
+          <div class="clone-status" id="clone-status"></div>
+        </div>
+        <div class="clone-hint">
+          Plapre kræver ingen finetuning — stemmen klones via Kanades globale embedding.<br>
+          <b>10–30 sekunder</b> ren tale uden baggrundsstøj giver de bedste resultater.<br>
+          Klonede stemmer gemmes i <b>/data/cloned_speakers/</b> og overlever genstarter.
+        </div>
+        <div class="clone-list-head">Klonede stemmer</div>
+        <div class="clone-list" id="clone-list"><div style="color:var(--dim);font-size:12px;">Ingen klonede stemmer endnu</div></div>
+      </div>
     </div>
     <div class="pane" id="pane-stats">
       <div class="stats-grid">
@@ -248,6 +296,8 @@ async function init() {
     document.getElementById('phrase-list').innerHTML = '<div style="padding:30px 16px;color:var(--bad);font-size:13px;">Kunne ikke hente sætninger</div>';
   }
 
+  await loadClonedSpeakers();
+
   document.getElementById('speak-btn').disabled = false;
   drawIdle();
 }
@@ -320,6 +370,77 @@ document.querySelectorAll('.tab').forEach(tab => {
 document.getElementById('tts-input').addEventListener('keydown', e => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) document.getElementById('speak-btn').click();
 });
+
+// --- Voice cloning ---
+document.getElementById('clone-file').addEventListener('change', e => {
+  const f = e.target.files[0];
+  document.getElementById('clone-file-name').textContent = f ? f.name : '';
+  document.getElementById('clone-btn').disabled = !f || !document.getElementById('clone-name').value.trim();
+});
+document.getElementById('clone-name').addEventListener('input', () => {
+  const f = document.getElementById('clone-file').files[0];
+  document.getElementById('clone-btn').disabled = !f || !document.getElementById('clone-name').value.trim();
+});
+
+document.getElementById('clone-btn').addEventListener('click', async () => {
+  const name = document.getElementById('clone-name').value.trim();
+  const file = document.getElementById('clone-file').files[0];
+  if (!name || !file) return;
+  const btn = document.getElementById('clone-btn');
+  const status = document.getElementById('clone-status');
+  btn.disabled = true; btn.textContent = 'Kloner…';
+  status.className = 'clone-status'; status.textContent = 'Ekstraherer embedding…';
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${BASE}/v1/clone?name=${encodeURIComponent(name)}`, {method:'POST', body:fd});
+    if (!r.ok) { const t = await r.text(); throw new Error(t); }
+    const data = await r.json();
+    status.className = 'clone-status ok';
+    status.textContent = `✓ ${data.name} klonet (norm ${data.norm.toFixed(2)})`;
+    document.getElementById('clone-name').value = '';
+    document.getElementById('clone-file').value = '';
+    document.getElementById('clone-file-name').textContent = '';
+    await loadClonedSpeakers();
+    await refreshSpeakerButtons();
+  } catch(err) {
+    status.className = 'clone-status err'; status.textContent = `Fejl: ${err.message}`;
+  }
+  btn.disabled = false; btn.textContent = 'Klon stemme';
+});
+
+async function loadClonedSpeakers() {
+  const list = document.getElementById('clone-list');
+  try {
+    const r = await fetch(`${BASE}/v1/cloned-speakers`);
+    const data = await r.json();
+    if (!data.cloned.length) { list.innerHTML = '<div style="color:var(--dim);font-size:12px;">Ingen klonede stemmer endnu</div>'; return; }
+    list.innerHTML = '';
+    data.cloned.forEach(name => {
+      const item = document.createElement('div'); item.className = 'clone-item';
+      const label = document.createElement('div'); label.className = 'clone-item-name'; label.textContent = name;
+      const del = document.createElement('button'); del.className = 'clone-del'; del.textContent = 'Slet';
+      del.onclick = async () => {
+        await fetch(`${BASE}/v1/clone/${encodeURIComponent(name)}`, {method:'DELETE'});
+        await loadClonedSpeakers(); await refreshSpeakerButtons();
+      };
+      item.appendChild(label); item.appendChild(del); list.appendChild(item);
+    });
+  } catch(e) { list.innerHTML = '<div style="color:var(--bad);font-size:12px;">Kunne ikke hente liste</div>'; }
+}
+
+async function refreshSpeakerButtons() {
+  try {
+    const s = await (await fetch(`${BASE}/v1/speakers`)).json();
+    const row = document.getElementById('speaker-row'); row.innerHTML = '';
+    s.speakers.forEach(sp => {
+      const btn = document.createElement('button');
+      btn.className = 'spk-btn' + (sp === activeSpeaker ? ' active' : '');
+      btn.textContent = sp.charAt(0).toUpperCase() + sp.slice(1);
+      btn.onclick = () => { activeSpeaker = sp; row.querySelectorAll('.spk-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); };
+      row.appendChild(btn);
+    });
+  } catch(e) {}
+}
 
 init();
 </script>

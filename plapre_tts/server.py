@@ -1,7 +1,7 @@
-import hashlib, io, json, logging, os, struct, subprocess, sys, tempfile, threading
+import hashlib, io, json, logging, os, re, struct, subprocess, sys, tempfile, threading
 from pathlib import Path
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
@@ -22,12 +22,13 @@ if HF_TOKEN:
     os.environ["HF_TOKEN"] = HF_TOKEN
 SPEAKERS = ["tor", "ida", "liv", "ask", "kaj"]  # updated after startup
 CACHE_DIR = Path("/data/phrases")
+CLONED_DIR = Path("/data/cloned_speakers")
 
 # Load pre-defined phrases
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.19")
+app = FastAPI(title="Plapre TTS", version="1.0.20")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -197,13 +198,21 @@ def _load_speaker_embs():
 async def startup():
     global tts, speaker_embs
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    CLONED_DIR.mkdir(parents=True, exist_ok=True)
     _install_plapre()
+    import torch
     from plapre import Plapre
     log.info(f"Loading model: {MODEL}")
     tts = Plapre(MODEL)
     speaker_embs = _load_speaker_embs()
     SPEAKERS.clear()
     SPEAKERS.extend(speaker_embs.keys())
+    # Load persisted cloned speakers from /data/cloned_speakers/
+    for p in sorted(CLONED_DIR.glob("*.json")):
+        emb = torch.tensor(json.loads(p.read_text()), dtype=torch.float32)
+        speaker_embs[p.stem] = emb
+        if p.stem not in SPEAKERS:
+            SPEAKERS.append(p.stem)
     log.info(f"Speakers loaded: {SPEAKERS}")
     log.info("Model ready")
     threading.Thread(target=_pregenerate_phrases, daemon=True, name="pre-gen").start()
@@ -237,6 +246,51 @@ def speakers():
 @app.get("/v1/phrases")
 def list_phrases():
     return {"phrases": DEFAULT_PHRASES, "count": len(DEFAULT_PHRASES)}
+
+
+@app.post("/v1/clone")
+async def clone_speaker(name: str, file: UploadFile = File(...)):
+    if tts is None:
+        raise HTTPException(503, "Model not ready yet")
+    name = re.sub(r"[^a-zA-Z0-9_-]", "_", name.strip())[:32]
+    if not name:
+        raise HTTPException(400, "name is empty")
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        import torch
+        emb = tts._extract_speaker_emb(tmp_path)
+        CLONED_DIR.mkdir(parents=True, exist_ok=True)
+        (CLONED_DIR / f"{name}.json").write_text(json.dumps(emb.tolist()))
+        speaker_embs[name] = emb
+        if name not in SPEAKERS:
+            SPEAKERS.append(name)
+        log.info(f"Cloned speaker {name!r}, norm={float(emb.norm()):.3f}")
+        return {"name": name, "norm": float(emb.norm())}
+    except Exception as exc:
+        log.exception("voice cloning failed")
+        raise HTTPException(500, str(exc))
+    finally:
+        os.unlink(tmp_path)
+
+
+@app.get("/v1/cloned-speakers")
+def list_cloned():
+    cloned = [p.stem for p in sorted(CLONED_DIR.glob("*.json"))] if CLONED_DIR.exists() else []
+    return {"cloned": cloned}
+
+
+@app.delete("/v1/clone/{name}")
+def delete_clone(name: str):
+    p = CLONED_DIR / f"{name}.json"
+    if p.exists():
+        p.unlink()
+    speaker_embs.pop(name, None)
+    if name in SPEAKERS:
+        SPEAKERS.remove(name)
+    return {"deleted": name}
 
 
 @app.post("/v1/audio/speech")
