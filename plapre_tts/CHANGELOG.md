@@ -1,3 +1,6 @@
+## 1.0.12
+- Fix: speak() takes speaker_emb= (torch.Tensor), not speaker= (string) — load speaker embeddings from speakers.json at startup and pass the right tensor per request
+
 ## 1.0.11
 - hf_token is now required — HA will not start the add-on until a HuggingFace token is configured
 
