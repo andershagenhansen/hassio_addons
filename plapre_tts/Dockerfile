@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast dep resolution
-RUN pip install --no-cache-dir uv hatchling
+RUN pip install --no-cache-dir uv
 
 # PyTorch CPU-only + FastAPI — plapre is installed on first boot by server.py
 RUN uv pip install --system --no-cache \
