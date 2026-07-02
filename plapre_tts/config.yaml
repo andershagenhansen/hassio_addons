@@ -1,5 +1,5 @@
 name: "Plapre TTS"
-version: "1.0.11"
+version: "1.0.12"
 slug: "plapre_tts_server"
 description: "Danish neural TTS — syvai/plapre-pico running locally on CPU"
 url: "https://huggingface.co/syvai/plapre-pico"
