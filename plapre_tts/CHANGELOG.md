@@ -1,3 +1,6 @@
+## 1.0.14
+- Fix: install espeak-ng — required by plapre for phonemization
+
 ## 1.0.13
 - Add HAOS ingress panel — Plapre TTS now appears in the HA sidebar with a built-in GUI
 - Serve ui.html from / with relative API URLs so it works through the ingress proxy
