@@ -1,3 +1,6 @@
+## 1.0.19
+- Fix: UI API calls now work through HAOS ingress — derive BASE from window.location.pathname so fetch paths include the ingress prefix (e.g. /abc123_plapre_tts_server/v1/audio/speech) instead of hitting the HA root
+
 ## 1.0.18
 - Fix: synthesis now works — with the transformers 5.x TokenizersBackend tokenizer, convert_tokens_to_ids() returns None for pico's added special tokens; patch inference.py to resolve all token IDs via get_vocab() and guard against None in generate(eos_token_id=…); verified with Docker: 135/135 phrases generated, zero failures
 - Fix: pre-install transformers>=5.0.0 in Dockerfile to ensure correct version is present at first-boot plapre install time

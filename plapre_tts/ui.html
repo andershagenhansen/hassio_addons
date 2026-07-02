@@ -135,8 +135,10 @@ textarea::placeholder { color:var(--dim); }
   </div>
 </div>
 <script>
-// Use relative URLs so it works both directly and through HAOS ingress proxy
-const BASE = '';
+// BASE: ingress prefix so API calls work both directly (:8000) and via HAOS ingress.
+// Direct:  pathname='/'                          → BASE=''
+// Ingress: pathname='/abc123_plapre_tts_server'  → BASE='/abc123_plapre_tts_server'
+const BASE = window.location.pathname.replace(/\/$/, '');
 let activeSpeaker = 'ida';
 let audioCtx = null, analyser = null, animFrame = null, currentSource = null;
 let phraseCache = {};
