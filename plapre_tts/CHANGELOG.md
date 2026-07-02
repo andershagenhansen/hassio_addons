@@ -1,3 +1,6 @@
+## 1.0.22
+- Add ffmpeg to Dockerfile — ensures torchaudio can decode MP3 and other formats for voice cloning
+
 ## 1.0.21
 - Fix: voice clone upload now decodes any audio format (MP3, OGG, FLAC, …) via torchaudio before extracting the speaker embedding — previously the raw bytes were saved with a .wav extension and passed directly, causing silent failures or crashes on non-WAV uploads
 
