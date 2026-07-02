@@ -7,21 +7,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for fast dep resolution
 RUN pip install --no-cache-dir uv hatchling
 
-# Install plapre and its dependencies (PyTorch CPU-only to keep image lean)
+# PyTorch CPU-only + FastAPI — plapre is installed on first boot by server.py
 RUN uv pip install --system --no-cache \
     torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-RUN git clone https://github.com/syv-ai/plapre.git /tmp/plapre_src \
-    && cd /tmp/plapre_src \
-    && git checkout bc8ad9ef61 \
-    && printf '\n[tool.hatch.metadata]\nallow-direct-references = true\n' >> pyproject.toml \
-    && uv pip install --system --no-cache --no-build-isolation . \
-    && rm -rf /tmp/plapre_src
 
 RUN uv pip install --system --no-cache fastapi "uvicorn[standard]"
 
 WORKDIR /app
-COPY server.py .
+COPY server.py phrases.json ./
 
 # Model weights are downloaded to /data on first start (persisted by HAOS)
 ENV HF_HOME=/data/hf_cache
