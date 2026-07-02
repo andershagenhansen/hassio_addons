@@ -1,3 +1,6 @@
+## 1.0.10
+- Fix: remove --no-build-isolation from first-boot pip install — kanade-tokenizer uses uv_build as its build backend which is not importable without isolation; pip's default isolated builds handle all backends automatically
+
 ## 1.0.9
 - Fix: explicitly install numpy — uv was not pulling it as a transitive dep of torch
 
