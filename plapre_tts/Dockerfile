@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir uv hatchling
 RUN uv pip install --system --no-cache \
     torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-RUN uv pip install --system --no-cache fastapi "uvicorn[standard]"
+RUN uv pip install --system --no-cache fastapi "uvicorn[standard]" numpy
 
 WORKDIR /app
 COPY server.py phrases.json ./
