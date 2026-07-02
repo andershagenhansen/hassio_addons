@@ -1,3 +1,6 @@
+## 1.0.11
+- hf_token is now required — HA will not start the add-on until a HuggingFace token is configured
+
 ## 1.0.10
 - Fix: remove --no-build-isolation from first-boot pip install — kanade-tokenizer uses uv_build as its build backend which is not importable without isolation; pip's default isolated builds handle all backends automatically
 
