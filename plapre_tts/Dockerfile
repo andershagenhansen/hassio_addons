@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv for fast dep resolution
-RUN pip install --no-cache-dir uv
+RUN pip install --no-cache-dir uv hatchling
 
 # Install plapre and its dependencies (PyTorch CPU-only to keep image lean)
 RUN uv pip install --system --no-cache \
