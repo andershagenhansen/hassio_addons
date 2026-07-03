@@ -1,3 +1,6 @@
+## 1.0.27
+- Fix: add explicit .m4a and other extensions to file picker accept list — iOS Voice Memos uses audio/x-m4a which some browsers exclude from the generic audio/* filter
+
 ## 1.0.26
 - Fix: replace torchaudio.load entirely with a pure Python/wave/numpy implementation — this torchaudio version ignores the backend kwarg and hardcodes TorchCodec regardless; since we always pass ffmpeg-converted PCM WAV files the built-in wave module is sufficient
 
