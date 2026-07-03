@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir uv
 RUN uv pip install --system --no-cache \
     torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-RUN uv pip install --system --no-cache fastapi "uvicorn[standard]" numpy "transformers>=5.0.0"
+RUN uv pip install --system --no-cache fastapi "uvicorn[standard]" numpy "transformers>=5.0.0" python-multipart
 
 WORKDIR /app
 COPY server.py phrases.json ui.html ./

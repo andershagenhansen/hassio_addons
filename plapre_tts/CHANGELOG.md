@@ -1,3 +1,6 @@
+## 1.0.23
+- Fix: add python-multipart to Dockerfile — required by FastAPI for file upload (UploadFile); server crashed on startup without it
+
 ## 1.0.22
 - Add ffmpeg to Dockerfile — ensures torchaudio can decode MP3 and other formats for voice cloning
 
