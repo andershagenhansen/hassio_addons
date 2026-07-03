@@ -1,3 +1,6 @@
+## 1.0.26
+- Fix: replace torchaudio.load entirely with a pure Python/wave/numpy implementation — this torchaudio version ignores the backend kwarg and hardcodes TorchCodec regardless; since we always pass ffmpeg-converted PCM WAV files the built-in wave module is sufficient
+
 ## 1.0.25
 - Fix: monkey-patch torchaudio.load to force backend="soundfile" at startup — newer torchaudio defaults to TorchCodec (not installed) even for WAV files; this affects plapre's internal _extract_speaker_emb call
 - Add soundfile to Dockerfile pip install (required by the soundfile torchaudio backend)

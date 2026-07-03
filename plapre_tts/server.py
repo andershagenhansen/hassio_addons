@@ -28,7 +28,7 @@ CLONED_DIR = Path("/data/cloned_speakers")
 _PHRASE_FILE = Path(__file__).parent / "phrases.json"
 DEFAULT_PHRASES: list[str] = json.loads(_PHRASE_FILE.read_text()) if _PHRASE_FILE.exists() else []
 
-app = FastAPI(title="Plapre TTS", version="1.0.25")
+app = FastAPI(title="Plapre TTS", version="1.0.26")
 tts = None          # initialised on first boot after plapre install
 speaker_embs = {}   # name → torch.Tensor, loaded at startup
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -200,13 +200,22 @@ async def startup():
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     CLONED_DIR.mkdir(parents=True, exist_ok=True)
     _install_plapre()
+    import wave as _wave
     import torch, torchaudio
-    # Force soundfile backend — newer torchaudio defaults to TorchCodec which isn't installed
-    _orig_ta_load = torchaudio.load
-    def _ta_load_soundfile(path, *args, **kwargs):
-        kwargs.setdefault("backend", "soundfile")
-        return _orig_ta_load(path, *args, **kwargs)
-    torchaudio.load = _ta_load_soundfile
+    # Replace torchaudio.load entirely — this torchaudio version hardcodes TorchCodec
+    # (not installed). We only ever pass ffmpeg-converted PCM WAV files, so the
+    # built-in wave module is sufficient and has zero extra dependencies.
+    def _ta_load_wav(path, *args, **kwargs):
+        with _wave.open(str(path), "rb") as wf:
+            n_ch = wf.getnchannels()
+            sw   = wf.getsampwidth()
+            sr   = wf.getframerate()
+            raw  = wf.readframes(wf.getnframes())
+        dtype = {1: np.int8, 2: np.int16, 4: np.int32}[sw]
+        pcm = np.frombuffer(raw, dtype=dtype).reshape(-1, n_ch).T.astype(np.float32)
+        pcm /= float(2 ** (8 * sw - 1))
+        return torch.from_numpy(pcm.copy()), sr
+    torchaudio.load = _ta_load_wav
     from plapre import Plapre
     log.info(f"Loading model: {MODEL}")
     tts = Plapre(MODEL)
