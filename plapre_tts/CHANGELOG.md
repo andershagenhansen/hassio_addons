@@ -1,3 +1,7 @@
+## 1.0.25
+- Fix: monkey-patch torchaudio.load to force backend="soundfile" at startup — newer torchaudio defaults to TorchCodec (not installed) even for WAV files; this affects plapre's internal _extract_speaker_emb call
+- Add soundfile to Dockerfile pip install (required by the soundfile torchaudio backend)
+
 ## 1.0.24
 - Fix: use ffmpeg subprocess instead of torchaudio for audio decoding in voice cloning — newer torchaudio defaults to TorchCodec which is not installed; ffmpeg is already in the image and handles all formats reliably
 
