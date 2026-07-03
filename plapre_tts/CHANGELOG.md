@@ -1,3 +1,6 @@
+## 1.0.24
+- Fix: use ffmpeg subprocess instead of torchaudio for audio decoding in voice cloning — newer torchaudio defaults to TorchCodec which is not installed; ffmpeg is already in the image and handles all formats reliably
+
 ## 1.0.23
 - Fix: add python-multipart to Dockerfile — required by FastAPI for file upload (UploadFile); server crashed on startup without it
 
